@@ -1,5 +1,6 @@
 """Streamlit entry point for the bank comparison."""
 from pathlib import Path
+from math import ceil, floor
 
 import altair as alt
 import pandas as pd
@@ -94,15 +95,27 @@ def show_trend(result: DailyTrend):
                           for row in result.rows])
     # Keep consecutive observations together without drawing across missing days.
     chart_data = table.assign(segment=table["Rate"].isna().cumsum())
+    observed = table["Rate"].dropna() * 100
+    lower, upper, step = 0, 100, 20
+    if not observed.empty:
+        low, high = observed.min(), observed.max()
+        span = min(100, max(5, (high - low) * 1.2))
+        # Shift the padded window inward at 0% and 100% to keep its full span.
+        start = max(0, min(100 - span, (low + high - span) / 2))
+        step = next(size for size in (1, 2, 5, 10, 20) if size * 6 >= span)
+        lower = max(0, floor(start / step) * step)
+        upper = min(100, ceil((start + span) / step) * step)
+    ticks = [value / 100 for value in range(lower, upper + 1, step)]
     chart = alt.Chart(chart_data).mark_line(point=True, color="#087849").encode(
         x=alt.X("Date (IST):O", title="Date (IST)", scale=alt.Scale(domain=table["Date (IST)"].tolist()),
                 axis=alt.Axis(labelExpr="slice(datum.label, 5)", labelOverlap=True)),
-        y=alt.Y("Rate:Q", title="Payment success rate", axis=alt.Axis(format="%"),
-                scale=alt.Scale(domain=[0, 1])),
+        y=alt.Y("Rate:Q", title="Payment success rate", axis=alt.Axis(format="%", values=ticks),
+                scale=alt.Scale(domain=[lower / 100, upper / 100], nice=False, zero=False)),
         detail="segment:N",
         tooltip=["Date (IST):O", alt.Tooltip("Rate:Q", format=".1%"),
                  "Successful attempts:Q", "Eligible attempts:Q"])
     st.altair_chart(chart.properties(height=300), use_container_width=True)
+    st.caption("Y-axis scaled to observed rates")
     if table["Rate"].isna().any():
         st.info("Dates with zero eligible attempts have no success rate and appear as gaps.")
     table["Rate"] = [percentage(row.rate) for row in result.rows]
