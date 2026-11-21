@@ -11,6 +11,17 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python -m pytest -q
 ```
 
+## Launch the comparison screen from PowerShell
+
+From the repository root, install the screen dependencies and start Streamlit.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+Choose **Offline preset**, leave **Clean** selected, and click **Run comparison**. Expand **Query and dataset evidence** to inspect the executed SQL, parameters and IST date windows. Repeat with **Broken** to see the missing-status error, then switch back to **Clean** and rerun to recover. To use **Live Gemini**, set the two environment variables described below in the PowerShell session before launching Streamlit.
+
 ## Try the question planner from PowerShell
 
 Run the offline preset from the repository root. With no question argument, the CLI uses the shipped October comparison.
