@@ -20,7 +20,7 @@ From the repository root, install the screen dependencies and start Streamlit.
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-Choose **Offline preset**, leave **Clean** selected, and click **Run comparison**. Expand **Query and dataset evidence** to inspect the executed SQL, parameters and IST date windows. Repeat with **Broken** to see the missing-status error, then switch back to **Clean** and rerun to recover. To use **Live Gemini**, set the two environment variables described below in the PowerShell session before launching Streamlit.
+Choose **Offline preset** and **Clean** in the sidebar, then click **Analyze**. Expand **Query and dataset evidence** to inspect the executed SQL, parameters and IST date windows. Repeat with **Broken** to see the missing-status error, then switch back to **Clean** and click **Analyze** to recover. To use **Live Gemini**, set the two environment variables described below in the PowerShell session before launching Streamlit.
 
 ## Try the question planner from PowerShell
 
