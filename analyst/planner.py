@@ -1,6 +1,7 @@
 """Plan a comparison from a question and execute only validated plans."""
 import json
 import os
+import re
 from http.client import HTTPException
 from pathlib import Path
 from urllib.error import HTTPError
@@ -10,7 +11,8 @@ from urllib.request import Request, urlopen
 from pydantic import TypeAdapter, ValidationError
 
 from .data import analyze_fixture
-from .plan import AnalysisPlan, Clarification, TrendPlan
+from .plan import AnalysisPlan, Clarification, TrendPlan, Window
+from .trend_dates import resolve_window
 
 QUESTION = ("Why did payment success rate fall from October 5–11 to October 12–18, "
             "2026? Break it down by bank.")
@@ -42,12 +44,16 @@ class PlannerError(ValueError):
     pass
 
 
-def gemini(question: str) -> str:
+def gemini(question: str, window: Window | None = None) -> str:
     key = os.getenv("GEMINI_API_KEY")
     model = os.getenv("GEMINI_MODEL")
     if not key or not model:
         raise PlannerError("Live planning requires GEMINI_API_KEY and GEMINI_MODEL.")
-    body = {"systemInstruction": {"parts": [{"text": CATALOG}]},
+    instructions = [{"text": CATALOG}]
+    if window:
+        instructions.append({"text": "For a supported daily trend, copy this resolved IST window exactly. "
+                             "Its end is already exclusive. " + window.model_dump_json()})
+    body = {"systemInstruction": {"parts": instructions},
             "contents": [{"role": "user", "parts": [{"text": question}]}],
             "generationConfig": {"responseMimeType": "application/json"}}
     request = Request("https://generativelanguage.googleapis.com/v1beta/models/"
@@ -82,11 +88,25 @@ def plan_question(question: str, mode: str) -> AnalysisPlan | TrendPlan | Clarif
         return Clarification(question="Use the shipped sample question or choose live mode for other wording.")
     if mode != "live":
         raise PlannerError("Choose live or offline mode.")
-    raw = gemini(question)
+    window = None
+    date_question = Clarification(question="Which start and final IST dates should I use for the daily trend?")
+    if re.search(r"\b(daily|trend|day.by.day|per day|each day|by day)\b", question, re.I):
+        try:
+            window = resolve_window(question)
+        except (ValueError, OverflowError) as exc:
+            raise PlannerError("Choose valid IST dates in order, spanning 1 to 31 days inclusive.") from exc
+        if window is None:
+            return date_question
+    raw = gemini(question, window)
     try:
         outcome = OUTPUT.validate_json(raw)
     except ValidationError as exc:
         raise PlannerError("Gemini returned an invalid or unsupported plan.") from exc
+    if isinstance(outcome, TrendPlan) and window is None:
+        return date_question
+    if window and not isinstance(outcome, Clarification):
+        if not isinstance(outcome, TrendPlan) or outcome.window != window:
+            raise PlannerError("Gemini returned a plan that does not match the requested daily window.")
     if not isinstance(outcome, Clarification) and set(outcome.bank_ids or ()) - {"A", "B"}:
         raise PlannerError("Choose Bank A or Bank B.")
     return outcome
