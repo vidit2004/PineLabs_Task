@@ -58,3 +58,14 @@ def test_live_comparison_uses_validated_filter(monkeypatch):
     stub_provider(monkeypatch, question, json.dumps(payload))
     answer = planner.ask(question, "live", Path(__file__).resolve().parents[1] / "data/fixtures/clean")
     assert [(row.bank_id, row.attempts) for row in answer.rows] == [("B", 200), ("B", 600)]
+
+
+def test_daily_planner_modes_and_missing_dates(monkeypatch, tmp_path):
+    stub_provider(monkeypatch, planner.TREND_QUESTION, planner.TREND_PRESET.model_dump_json())
+    for mode in ("live", "offline"):
+        assert planner.plan_question(planner.TREND_QUESTION, mode) == planner.TREND_PRESET
+    question = "Show daily payment success"
+    stub_provider(monkeypatch, question, '{"question":"Which start and final IST dates should I use?"}')
+    for mode in ("live", "offline"):
+        answer = planner.ask(question, mode, tmp_path)
+        assert isinstance(answer, Clarification) and "dates" in answer.question

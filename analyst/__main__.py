@@ -2,6 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .analysis import DailyTrend
 from .data import QualityError
 from .plan import Clarification
 from .planner import QUESTION, PlannerError, ask
@@ -27,6 +28,12 @@ def main():
         return 1
     if isinstance(result, Clarification):
         print(result.question)
+        return 0
+    if isinstance(result, DailyTrend):
+        for row in result.rows:
+            rate = "unavailable" if row.rate is None else f"{float(row.rate):.1%}"
+            print(f"{row.day} IST: {row.successes}/{row.attempts} ({rate})")
+        print(result.sql, result.parameters)
         return 0
     for period, rate in result.rates.items():
         value = "unavailable" if rate is None else f"{float(rate):.1%}"

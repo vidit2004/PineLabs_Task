@@ -24,6 +24,14 @@ Choose **Offline preset** and **Clean** in the sidebar, then click **Analyze**. 
 
 ## Try the question planner from PowerShell
 
+For daily results in the dashboard, select **Daily trend example** and click **Analyze**. The example covers October 5 through October 18, 2026, inclusive in IST. Both planners support it. Each chart point divides that day's successful attempts by its eligible attempts. A day with zero eligible attempts has an unavailable rate and breaks the line. The table includes every date, and the evidence panel shows the executed SQL and bound window.
+
+To run the same offline example from PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m analyst --mode offline "Show daily payment success from October 5 through October 18, 2026"
+```
+
 Run the offline preset from the repository root. With no question argument, the CLI uses the shipped October comparison.
 
 ```powershell

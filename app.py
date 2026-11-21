@@ -5,10 +5,10 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from analyst.analysis import Comparison
+from analyst.analysis import Comparison, DailyTrend
 from analyst.data import QualityError
 from analyst.plan import Clarification
-from analyst.planner import QUESTION, PlannerError, ask
+from analyst.planner import QUESTION, TREND_QUESTION, PlannerError, ask
 
 FIXTURES = Path(__file__).resolve().parent / "data" / "fixtures"
 
@@ -42,15 +42,18 @@ def show_comparison(result: Comparison, fixture: str):
             y=alt.Y("Bank:N", title=None, axis=alt.Axis(labelFontSize=13, ticks=False, domain=False)),
             yOffset=alt.YOffset("Period:N", sort=["Baseline", "Current"]),
             x=alt.X("Rate:Q", title="Success rate", scale=alt.Scale(domain=[0, 1]),
-                    axis=alt.Axis(format="%", tickCount=6)),
+                    axis=alt.Axis(format="%", values=[0, .2, .4, .6, .8, 1])),
             tooltip=["Bank", "Period", alt.Tooltip("Rate:Q", format=".1%"), "Attempts", "Successes"])
-        bars = base.mark_bar(size=23, cornerRadiusEnd=3).encode(
+        bars = base.mark_bar(size=30, cornerRadiusEnd=4).encode(
             color=alt.Color("Period:N", title=None, legend=alt.Legend(orient="top"),
-                            scale=alt.Scale(domain=["Baseline", "Current"], range=["#516981", "#09695F"])))
-        labels = base.mark_text(fontWeight="bold", dx=alt.ExprRef(expr="datum.Rate >= 0.15 ? -27 : 27")).encode(
+                            scale=alt.Scale(domain=["Baseline", "Current"], range=["#103F30", "#087F4C"])))
+        labels = base.mark_text(fontSize=14, fontWeight="bold", dx=alt.ExprRef(expr="datum.Rate >= 0.15 ? -32 : 32")).encode(
             text=alt.Text("Rate:Q", format=".1%"),
             color=alt.condition("datum.Rate >= 0.15", alt.value("white"), alt.value("#172D36")))
-        chart = (bars + labels).properties(height=80 * table["Bank"].nunique()).configure_view(stroke=None)
+        chart = (bars + labels).properties(width="container", height=120 + 120 * table["Bank"].nunique())
+        chart = chart.configure_axis(labelFontSize=13, titleFontSize=13, labelColor="#334F41",
+                                     titleColor="#17352A", gridColor="#DAE8DF").configure_legend(
+            labelFontSize=14, labelColor="#334F41", symbolSize=140, padding=6).configure_view(stroke=None)
         st.altair_chart(chart, use_container_width=True)
         for column in ("Rate", "Attempt share"):
             table[column] = table[column].map(percentage)
@@ -83,48 +86,100 @@ def show_comparison(result: Comparison, fixture: str):
                 actions.write("Inspect daily failure codes for " + ", ".join(changed)
                          + " across both windows.")
 
+
+def show_trend(result: DailyTrend):
+    st.subheader("Daily payment success")
+    table = pd.DataFrame([{"Date (IST)": row.day.isoformat(), "Successful attempts": row.successes,
+                           "Eligible attempts": row.attempts, "Rate": float(row.rate) if row.attempts else None}
+                          for row in result.rows])
+    # Keep consecutive observations together without drawing across missing days.
+    chart_data = table.assign(segment=table["Rate"].isna().cumsum())
+    chart = alt.Chart(chart_data).mark_line(point=True, color="#087849").encode(
+        x=alt.X("Date (IST):O", title="Date (IST)", scale=alt.Scale(domain=table["Date (IST)"].tolist()),
+                axis=alt.Axis(labelExpr="slice(datum.label, 5)", labelOverlap=True)),
+        y=alt.Y("Rate:Q", title="Payment success rate", axis=alt.Axis(format="%"),
+                scale=alt.Scale(domain=[0, 1])),
+        detail="segment:N",
+        tooltip=["Date (IST):O", alt.Tooltip("Rate:Q", format=".1%"),
+                 "Successful attempts:Q", "Eligible attempts:Q"])
+    st.altair_chart(chart.properties(height=300), use_container_width=True)
+    if table["Rate"].isna().any():
+        st.info("Dates with zero eligible attempts have no success rate and appear as gaps.")
+    table["Rate"] = [percentage(row.rate) for row in result.rows]
+    st.dataframe(table, hide_index=True, use_container_width=True)
+
+
+def show_evidence(result: Comparison | DailyTrend, fixture: str):
     with st.expander("Query and dataset evidence"):
-        st.write("Quality checks passed for this comparison.")
+        st.write("Quality checks passed for this analysis.")
         st.write(f"Synthetic datasets: {fixture}/transactions.csv and {fixture}/banks.csv")
         st.write("Success rate divides successful attempts by eligible terminal attempts with a valid bank.")
-        for period in ("baseline", "current"):
+        for period in (("window",) if isinstance(result, DailyTrend) else ("baseline", "current")):
             start = result.parameters[f"{period}_start"]
             end = result.parameters[f"{period}_end"]
-            st.write(f"{period.title()} window (IST): {start} through {end} (exclusive end)")
+            label = "Trend" if period == "window" else period.title()
+            st.write(f"{label} window (IST): {start} through {end} (exclusive end)")
         st.markdown("**Executed SQL**")
         st.code(result.sql, language="sql")
         st.markdown("**Bound parameters**")
         st.json(result.parameters)
 
 
-def restore_question():
-    st.session_state.question = QUESTION
+def restore_question(example):
+    st.session_state.question = example
 
 
 def main():
-    st.set_page_config(page_title="Payment success by bank", layout="wide")
+    st.set_page_config(page_title="Bizilytix.ai", layout="wide")
     st.html("""<style>
-        .stMainBlockContainer { max-width: 70rem; padding-top: 3rem; }
-        [data-testid="stMetric"] { font-variant-numeric: tabular-nums; }
+        .stMain { background: #F3F9F5; }
+        .stMainBlockContainer { --gutter: clamp(1rem, 3vw, 3rem);
+            max-width: none; padding: 3.75rem var(--gutter) 4rem; }
+        .biz-banner { background: #103F30; margin-inline: calc(-1 * var(--gutter));
+            padding: 1rem var(--gutter); }
+        .biz-banner h1 { color: white; font-size: 1.7rem; line-height: 1.25; margin: 0 0 .2rem;
+            padding: 0; letter-spacing: -.04em; }
+        .biz-banner p { color: #C7EFD5; font-size: .88rem; margin: 0; }
+        .st-key-question_panel, [data-testid="stMetric"], [data-testid="stExpander"] details {
+            background: white; border: 1px solid #B9D3C3; border-radius: .65rem; }
+        [data-testid="stMetric"] { font-variant-numeric: tabular-nums;
+            color: #103F30; padding: .8rem 1rem; }
+        .stMain h3, .stMain h4 { color: #14563B; }
+        [data-testid="stExpander"] details summary { color: #103F30; background: #EDF8F1; }
+        [data-testid="stExpander"] details summary:focus { color: #075B38; box-shadow: none; }
+        .st-key-question_panel button[kind="primary"] { background: #087849; color: white; border-color: #087849; }
+        .st-key-question_panel button[kind="primary"]:hover { background: #065F3A; }
+        .st-key-question_panel button[kind="secondary"] { color: #115539; border-color: #80AB91; background: white; }
+        .st-key-question_panel button[kind="secondary"]:hover { background: #E5F3EA; }
+        .st-key-question_panel button:focus-visible,
+        [data-testid="stExpander"] details summary:focus-visible,
+        [data-testid="stSidebar"] label:has(input:focus-visible) {
+            outline: 3px solid #087849; outline-offset: 2px; }
+        [data-testid="stSidebar"] h2 { color: #103F30; padding-bottom: .5rem; }
+        [data-testid="stSidebar"] [role="radiogroup"] { gap: .25rem; }
+        [data-testid="stSidebar"] [role="radiogroup"] label {
+            padding: .35rem .65rem; margin: 0; border-radius: .4rem; }
+        [data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+            background: #D2EADB; color: #103F30; }
         [data-testid="stMetricValue"] { letter-spacing: -.04em; }
-        @media (max-width: 800px) { .stMainBlockContainer { padding-top: 2.5rem; } }
         </style>""")
     with st.sidebar:
         st.header("Analysis settings")
         mode = st.radio("Planner", ["Offline preset", "Live Gemini"],
-                        help="Offline uses the sample question. Gemini plans custom comparisons.")
+                        help="Offline uses the sample questions. Gemini plans custom comparisons and daily trends.")
         st.divider()
         fixture = st.radio("Synthetic fixture", ["Clean", "Broken"],
                            help="Broken contains one missing payment status.").lower()
-    st.title("Payment success by bank")
-    with st.container(border=True):
-        question = st.text_area("Comparison question", value=QUESTION, key="question", height=85)
+    st.html('<header class="biz-banner"><h1>Bizilytix.ai</h1><p>AI Business Analyst</p></header>')
+    with st.container(border=True, key="question_panel"):
+        question = st.text_area("Analysis question", value=QUESTION, key="question", height=85)
         with st.container(horizontal=True):
             submitted = st.button("Analyze", type="primary", disabled=not question.strip())
-            st.button("Use sample question", on_click=restore_question)
+            st.button("Bank comparison example", on_click=restore_question, args=(QUESTION,))
+            st.button("Daily trend example", on_click=restore_question, args=(TREND_QUESTION,))
     if submitted:
         try:
-            with st.spinner("Running comparison…"):
+            with st.spinner("Running analysis…"):
                 result = ask(question, "offline" if mode == "Offline preset" else "live", FIXTURES / fixture)
         except QualityError as exc:
             st.error(str(exc))
@@ -135,7 +190,11 @@ def main():
             if isinstance(result, Clarification):
                 st.info(result.question)
             else:
-                show_comparison(result, fixture)
+                if isinstance(result, DailyTrend):
+                    show_trend(result)
+                else:
+                    show_comparison(result, fixture)
+                show_evidence(result, fixture)
 
 
 main()

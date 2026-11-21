@@ -4,8 +4,8 @@ from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from .analysis import BankCounts, summarize
-from .plan import AnalysisPlan
+from .analysis import BankCounts, summarize, summarize_trend
+from .plan import AnalysisPlan, TrendPlan
 from .queries import compile_queries
 
 
@@ -31,7 +31,7 @@ def stage(folder, database):
         db.execute("CREATE INDEX attempt_ids ON transactions(attempt_id)")
 
 
-def compare(database: Path, plan: AnalysisPlan):
+def execute_plan(database: Path, plan: AnalysisPlan | TrendPlan):
     scope, metric, params = compile_queries(plan)
     with closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)) as db:
         db.execute("BEGIN")
@@ -55,12 +55,19 @@ def compare(database: Path, plan: AnalysisPlan):
                 window = getattr(plan, period)
                 raise QualityError(f"Analysis blocked: {label} in {period} [{window.start}, {window.end}), "
                                    f"{count} affected. Correct the source or choose a clean dataset and rerun.")
-        rows = tuple(BankCounts(*row) for row in db.execute(metric, params))
+        cursor = db.execute(metric, params)
+        if isinstance(plan, TrendPlan):
+            return summarize_trend(cursor, plan.window, metric, params)
+        rows = tuple(BankCounts(*row) for row in cursor)
     return summarize(rows, metric, params)
 
 
-def analyze_fixture(folder: Path, plan: AnalysisPlan):
+def compare(database: Path, plan: AnalysisPlan):
+    return execute_plan(database, plan)
+
+
+def analyze_fixture(folder: Path, plan: AnalysisPlan | TrendPlan):
     with TemporaryDirectory() as temp:
         database = Path(temp) / "fixture.sqlite"
         stage(folder, database)
-        return compare(database, plan)
+        return execute_plan(database, plan)

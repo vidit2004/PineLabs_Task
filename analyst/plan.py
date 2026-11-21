@@ -46,5 +46,13 @@ class AnalysisPlan(Contract):
         return self
 
 
+class TrendPlan(Contract):
+    intent: Literal["trend"]
+    metric: Literal["success_rate"]
+    group_by: Literal["overall"]
+    window: Window
+    bank_ids: tuple[StrictStr, ...] | None = Field(default=None, min_length=1)
+
+
 class Clarification(Contract):
     question: StrictStr = Field(min_length=1)
