@@ -1,0 +1,11 @@
+[theme]
+base = "light"
+primaryColor = "#087849"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#EDF8F1"
+textColor = "#17352A"
+
+[theme.sidebar]
+primaryColor = "#087849"
+backgroundColor = "#E4F1E9"
+secondaryBackgroundColor = "#FFFFFF"

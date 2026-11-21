@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date, timedelta
 from fractions import Fraction
 
 
@@ -13,6 +14,31 @@ class BankCounts:
     @property
     def rate(self):
         return Fraction(self.successes, self.attempts)
+
+
+@dataclass(frozen=True)
+class DailyCounts:
+    day: date
+    attempts: int
+    successes: int
+
+    @property
+    def rate(self):
+        return Fraction(self.successes, self.attempts) if self.attempts else None
+
+
+@dataclass(frozen=True)
+class DailyTrend:
+    rows: tuple[DailyCounts, ...]
+    sql: str
+    parameters: dict[str, str]
+
+
+def summarize_trend(rows, window, sql, parameters):
+    counts = {day: (attempts, successes) for day, attempts, successes in rows}
+    days = (window.start + timedelta(days=i) for i in range((window.end - window.start).days))
+    return DailyTrend(tuple(DailyCounts(day, *counts.get(day.isoformat(), (0, 0))) for day in days),
+                      sql, parameters)
 
 
 @dataclass(frozen=True)

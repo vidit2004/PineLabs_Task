@@ -11,7 +11,26 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python -m pytest -q
 ```
 
+## Launch the comparison screen from PowerShell
+
+From the repository root, install the screen dependencies and start Streamlit.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+Choose **Offline preset** and **Clean** in the sidebar, then click **Analyze**. Expand **Query and dataset evidence** to inspect the executed SQL, parameters and IST date windows. Repeat with **Broken** to see the missing-status error, then switch back to **Clean** and click **Analyze** to recover. To use **Live Gemini**, set the two environment variables described below in the PowerShell session before launching Streamlit.
+
 ## Try the question planner from PowerShell
+
+For daily results in the dashboard, select **Daily trend example** and click **Analyze**. The example covers October 5 through October 18, 2026, inclusive in IST. Both planners support it. Each chart point divides that day's successful attempts by its eligible attempts. A day with zero eligible attempts has an unavailable rate and breaks the line. The table includes every date, and the evidence panel shows the executed SQL and bound window.
+
+To run the same offline example from PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m analyst --mode offline "Show daily payment success from October 5 through October 18, 2026"
+```
 
 Run the offline preset from the repository root. With no question argument, the CLI uses the shipped October comparison.
 
