@@ -5,7 +5,15 @@ Bizilytix.ai helps you investigate changes in payment success rates by bank and 
 - [Deployed app link](https://pinelabstask-case2-22me3ai33.streamlit.app/?embed=true)
 - [Live demo video](https://drive.google.com/file/d/1S9iQF80ems8IuxPlVzVoUq74QI1Q7zr-/view)
 
-The dashboard is hosted on Streamlit Community Cloud and deploys from `main` using `app.py`. To try the demo without an API key, select **Offline preset** and **Clean** in the sidebar, choose **Bank comparison example**, then click **Analyze**.
+### How to try the deployed app
+
+1. Open the deployed app. If the sidebar is collapsed, open it with the arrow at the top left. Select **Offline preset** and **Clean** to run the example without an API key.
+2. Set **Demo role** to **Analyst**, choose **Bank comparison example**, and click **Analyze**.
+3. Scroll down to see how the payment success rate changed. Expand **Query and dataset evidence** to inspect the SQL and source data. Choose **Daily trend example** and click **Analyze** to explore a second view.
+
+Watch the **Live demo video** linked above for a walkthrough of the dashboard.
+
+The app is hosted on Streamlit Community Cloud and deploys from `main` using `app.py`.
 
 Bizilytix.ai analyzes payment success by bank and by day. It validates an analysis plan, runs parameterized SQL against a read-only SQLite snapshot, and shows the counts behind each rate.
 
