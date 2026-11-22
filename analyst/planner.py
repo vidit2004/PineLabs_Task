@@ -2,6 +2,7 @@
 import json
 import os
 import re
+from datetime import date
 from http.client import HTTPException
 from pathlib import Path
 from urllib.error import HTTPError
@@ -18,11 +19,11 @@ QUESTION = ("Why did payment success rate fall from October 5–11 to October 12
             "2026? Break it down by bank.")
 PARAPHRASE = "Compare payment success by bank for Oct 5-11 and Oct 12-18, 2026."
 PRESET = AnalysisPlan(intent="compare", metric="success_rate", group_by="bank",
-                      baseline={"start": "2026-10-05", "end": "2026-10-12"},
-                      current={"start": "2026-10-12", "end": "2026-10-19"})
+                      baseline=Window(start=date(2026, 10, 5), end=date(2026, 10, 12)),
+                      current=Window(start=date(2026, 10, 12), end=date(2026, 10, 19)))
 TREND_QUESTION = "Show daily payment success from October 5 through October 18, 2026"
 TREND_PRESET = TrendPlan(intent="trend", metric="success_rate", group_by="overall",
-                        window={"start": "2026-10-05", "end": "2026-10-19"})
+                        window=Window(start=PRESET.baseline.start, end=PRESET.current.end))
 CATALOG = """Return a single JSON object. For a bank comparison use:
 intent="compare", metric="success_rate", group_by="bank", baseline and current
 (each an object with start and end YYYY-MM-DD dates), optional bank_ids (A or B).

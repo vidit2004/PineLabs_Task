@@ -91,7 +91,7 @@ def show_comparison(result: Comparison, fixture: str):
 def show_trend(result: DailyTrend):
     st.subheader("Daily payment success")
     table = pd.DataFrame([{"Date (IST)": row.day.isoformat(), "Successful attempts": row.successes,
-                           "Eligible attempts": row.attempts, "Rate": float(row.rate) if row.attempts else None}
+                           "Eligible attempts": row.attempts, "Rate": float(row.rate) if row.rate is not None else None}
                           for row in result.rows])
     # Keep consecutive observations together without drawing across missing days.
     chart_data = table.assign(segment=table["Rate"].isna().cumsum())
