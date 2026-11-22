@@ -10,9 +10,9 @@ def seed(root=ROOT):
         folder = root / variant
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "banks.csv").open("w", newline="", encoding="utf-8") as stream:
-            csv.writer(stream).writerows([("bank_id", "bank_name"), ("A", "Bank A"), ("B", "Bank B")])
+            csv.writer(stream, lineterminator="\n").writerows([("bank_id", "bank_name"), ("A", "Bank A"), ("B", "Bank B")])
         with (folder / "transactions.csv").open("w", newline="", encoding="utf-8") as stream:
-            writer = csv.writer(stream)
+            writer = csv.writer(stream, lineterminator="\n")
             writer.writerow(("attempt_id", "event_date_ist", "bank_id", "status"))
             for day, bank, total, successes in [(5, "A", 800, 784), (5, "B", 200, 180),
                                                 (12, "A", 400, 392), (12, "B", 600, 528)]:
