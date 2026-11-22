@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from analyst.analysis import Comparison, DailyTrend
-from analyst.data import AccessDenied, DemoRole, QualityError
+from analyst.data import AccessDenied, DemoRole, QualityError, ResultCache
 from analyst.plan import Clarification
 from analyst.planner import BANK_B_QUESTION, QUESTION, TREND_QUESTION, PlannerError, ask
 
@@ -196,7 +196,10 @@ def main():
     if submitted:
         try:
             with st.spinner("Running analysis…"):
-                result = ask(question, "offline" if mode == "Offline preset" else "live", FIXTURES / fixture, role)
+                if "result_cache" not in st.session_state:
+                    st.session_state.result_cache = ResultCache()
+                result = ask(question, "offline" if mode == "Offline preset" else "live", FIXTURES / fixture,
+                             role, cache=st.session_state.result_cache)
         except AccessDenied as exc:
             st.error(str(exc))
         except QualityError as exc:
