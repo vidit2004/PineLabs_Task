@@ -1,44 +1,23 @@
-# Payment success comparison
+# Bizilytix.ai
 
-The analyst turns a question into a validated bank comparison against fictional payment attempts. Each transactions.csv row is one attempt identified by attempt_id. Each banks.csv row is one bank identified by bank_id. Success rate divides successful attempts by eligible terminal attempts (SUCCESS or FAILED with a matching bank). Overall rates use summed counts.
+Bizilytix.ai analyzes payment success by bank and by day. It validates an analysis plan, runs parameterized SQL against a read-only SQLite snapshot, and shows the counts behind each rate.
 
-From the repository root in PowerShell, using Python 3.11 (development version 3.11.5):
+## PowerShell quick start
+
+From the repository root on Windows with Python 3.11 installed (tested with 3.11.5), run both offline examples against the shipped clean fixture. Neither example requires credentials.
 
 ```powershell
 py -3.11 -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements.txt
-.\.venv\Scripts\python scripts/seed_demo.py
-.\.venv\Scripts\python -m pytest -q
-```
-
-## Launch the comparison screen from PowerShell
-
-From the repository root, install the screen dependencies and start Streamlit.
-
-```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m streamlit run app.py
-```
-
-Choose **Offline preset** and **Clean** in the sidebar, then click **Analyze**. Expand **Query and dataset evidence** to inspect the executed SQL, parameters and IST date windows. Repeat with **Broken** to see the missing-status error, then switch back to **Clean** and click **Analyze** to recover. To use **Live Gemini**, set the two environment variables described below in the PowerShell session before launching Streamlit.
-
-## Try the question planner from PowerShell
-
-For daily results in the dashboard, select **Daily trend example** and click **Analyze**. The example covers October 5 through October 18, 2026, inclusive in IST. Both planners support it. Each chart point divides that day's successful attempts by its eligible attempts. A day with zero eligible attempts has an unavailable rate and breaks the line. The table includes every date, and the evidence panel shows the executed SQL and bound window.
-
-To run the same offline example from PowerShell:
-
-```powershell
+.\.venv\Scripts\python.exe -m analyst --mode offline
 .\.venv\Scripts\python.exe -m analyst --mode offline "Show daily payment success from October 5 through October 18, 2026"
 ```
 
-Run the offline preset from the repository root. With no question argument, the CLI uses the shipped October comparison.
+The first command after setup compares October 5–11 with October 12–18. The second prints successful and eligible attempts for each of the 14 IST dates, followed by its SQL and parameters. October 5 has 138 successes from 144 attempts (95.8%).
 
-```powershell
-.\.venv\Scripts\python.exe -m analyst --mode offline
-```
+## Optional Live Gemini setup
 
-For a separate live smoke test, enter your Gemini API key and a model ID available to your account that supports JSON output. The adapter sends the question and approved catalog to Gemini. The local executor validates the response and computes the numbers.
+In the same PowerShell session, enter an API key and a Gemini model ID available to your account that supports JSON output.
 
 ```powershell
 $env:GEMINI_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'Gemini API key' -AsSecureString)).Password
@@ -46,21 +25,35 @@ $env:GEMINI_MODEL = Read-Host 'Gemini model ID (without models/)'
 .\.venv\Scripts\python.exe -m analyst --mode live "Compare payment success by bank for Oct 5-11 and Oct 12-18, 2026."
 ```
 
-Both examples should report 96.4% and 92.0%, with mix and within-bank effects of −3.2 pp and −1.2 pp. Live mode also accepts custom questions. A clarification prints a follow-up question. A planner error exits with status 1 and you can explicitly rerun the offline command. Add `--fixture broken` to try the quality gate.
+Gemini proposes the plan. Python validates it and computes the results locally.
 
-The seed is deterministic. The broken variant clears one current-week status. The following example uses the shipped files directly:
+## Dashboard
 
-```python
-from pathlib import Path
-from analyst.data import analyze_fixture
-from analyst.plan import AnalysisPlan
+Run `.\.venv\Scripts\python.exe -m streamlit run app.py`. Select a planner and fixture in the sidebar, choose a bank comparison or daily trend example, then click **Analyze**. Expand **Query and dataset evidence** to inspect the executed SQL, bound parameters, source datasets and IST date windows.
 
-plan = AnalysisPlan(intent="compare", metric="success_rate", group_by="bank",
-                    baseline={"start": "2026-10-05", "end": "2026-10-12"},
-                    current={"start": "2026-10-12", "end": "2026-10-19"})
-answer = analyze_fixture(Path("data/fixtures/clean"), plan)
-print(answer.rows, answer.rates, answer.mix_pp, answer.performance_pp)
-print(answer.sql, answer.parameters)
+## Synthetic data and metric
+
+Each variant in `data/fixtures/` contains two fictional datasets. In `transactions.csv`, each row is one payment attempt with an attempt ID, IST event date, bank ID and terminal status. In `banks.csv`, each row maps one unique bank ID to its display name. The clean fixture contains 2,000 attempts across Bank A and Bank B. The broken fixture clears one October 12 status. Running the sample comparison on **Broken** triggers a quality error. Switch back to **Clean** and rerun to recover.
+
+Success rate is successful attempts divided by eligible attempts. Eligible attempts have a matching bank ID and a terminal status of `SUCCESS` or `FAILED`. Quality errors in scope block the answer. Overall and daily rates use summed counts. A day with zero eligible attempts has an unavailable rate and appears as a gap. Date windows use an inclusive start and exclusive end in IST.
+
+## Bank comparison and attribution
+
+| Bank | Oct 5–11 successes / eligible | Oct 12–18 successes / eligible |
+|---|---:|---:|
+| Bank A | 784 / 800 (98.0%) | 392 / 400 (98.0%) |
+| Bank B | 180 / 200 (90.0%) | 528 / 600 (88.0%) |
+| Overall | 964 / 1,000 (96.4%) | 920 / 1,000 (92.0%) |
+
+The observed decline is **4.4 percentage points**. Two descriptive effects reconcile it:
+
+- **Bank mix (−3.2 pp).** Hold each bank’s success rate at its baseline and change its share of attempts. Bank B’s share rose from 20% to 60%, shifting 40% of attempts toward a bank with an 8-point lower baseline rate.
+- **Within-bank performance (−1.2 pp).** Weight each bank’s rate change by its current attempt share. Bank A’s rate held steady. Bank B fell by 2 points and handled 60% of current attempts.
+
+## Reproduce the fixtures and run tests
+
+```powershell
+.\.venv\Scripts\python.exe scripts/seed_demo.py
+git diff --exit-code -- data/fixtures
+.\.venv\Scripts\python.exe -m pytest -q
 ```
-
-Windows use IST dates with exclusive ends. The temporary staging database preserves source rows for quality checks. Analysis opens it read-only and checks data in the same snapshot as the count query. A QualityError blocks the result. The mix effect weights changes in attempt share by baseline bank rates. The performance effect weights bank rate changes by current shares. Both are descriptive percentage-point contributions.
