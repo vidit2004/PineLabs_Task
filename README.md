@@ -1,8 +1,12 @@
 # Bizilytix.ai
 
+**[Open the live demo](https://pinelabstask-case2-22me3ai33.streamlit.app/?embed=true)**
+
+The dashboard is hosted on Streamlit Community Cloud and deploys from `main` using `app.py`. To try the demo without an API key, select **Offline preset** and **Clean** in the sidebar, choose **Bank comparison example**, then click **Analyze**.
+
 Bizilytix.ai analyzes payment success by bank and by day. It validates an analysis plan, runs parameterized SQL against a read-only SQLite snapshot, and shows the counts behind each rate.
 
-## PowerShell quick start
+## Run locally (PowerShell)
 
 From the repository root on Windows with Python 3.11 installed (tested with 3.11.5), run both offline examples against the shipped clean fixture. Neither example requires credentials.
 
@@ -14,6 +18,12 @@ py -3.11 -m venv .venv
 ```
 
 The first command after setup compares October 5–11 with October 12–18. The second prints successful and eligible attempts for each of the 14 IST dates, followed by its SQL and parameters. October 5 has 138 successes from 144 attempts (95.8%).
+
+To launch the dashboard locally after installing the dependencies, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
 
 ## Optional Live Gemini setup
 
@@ -46,7 +56,7 @@ Each Streamlit session keeps its 32 most recently used successful results. After
 
 Use **Demo role** below the banner to switch between **Analyst** (both banks) and **Bank A Viewer**. With **Offline preset** and **Clean** selected, run the bank comparison as the viewer to see Bank A’s counts and bound SQL filter. Select **Bank B example** and click **Analyze** to reproduce the denial. Switching to Analyst allows the same example. The selector demonstrates role scoping locally and is user-controlled.
 
-Run `.\.venv\Scripts\python.exe -m streamlit run app.py`. Select a planner and fixture in the sidebar, choose a bank comparison or daily trend example, then click **Analyze**. Expand **Query and dataset evidence** to inspect the executed SQL, bound parameters, source datasets and IST date windows.
+Select a planner and fixture in the sidebar, choose a bank comparison or daily trend example, then click **Analyze**. Expand **Query and dataset evidence** to inspect the executed SQL, bound parameters, source datasets and IST date windows.
 
 ## Synthetic data and metric
 
