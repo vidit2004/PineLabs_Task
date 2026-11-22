@@ -1,6 +1,9 @@
 # Bizilytix.ai
 
-**[Open the live demo](https://pinelabstask-case2-22me3ai33.streamlit.app/?embed=true)**
+Bizilytix.ai helps you investigate changes in payment success rates by bank and by day. Open the deployed app to try an analysis yourself, or watch the demo video for a walkthrough.
+
+- [Deployed app link](https://pinelabstask-case2-22me3ai33.streamlit.app/?embed=true)
+- [Live demo video](https://drive.google.com/file/d/1S9iQF80ems8IuxPlVzVoUq74QI1Q7zr-/view)
 
 The dashboard is hosted on Streamlit Community Cloud and deploys from `main` using `app.py`. To try the demo without an API key, select **Offline preset** and **Clean** in the sidebar, choose **Bank comparison example**, then click **Analyze**.
 
