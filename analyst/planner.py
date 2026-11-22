@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 
 from pydantic import TypeAdapter, ValidationError
 
-from .data import analyze_fixture
+from .data import AccessDenied, DemoRole, analyze_fixture
 from .plan import AnalysisPlan, Clarification, TrendPlan, Window
 from .trend_dates import resolve_window
 
@@ -22,6 +22,7 @@ PRESET = AnalysisPlan(intent="compare", metric="success_rate", group_by="bank",
                       baseline=Window(start=date(2026, 10, 5), end=date(2026, 10, 12)),
                       current=Window(start=date(2026, 10, 12), end=date(2026, 10, 19)))
 TREND_QUESTION = "Show daily payment success from October 5 through October 18, 2026"
+BANK_B_QUESTION = "Compare Bank B payment success for Oct 5-11 and Oct 12-18, 2026."
 TREND_PRESET = TrendPlan(intent="trend", metric="success_rate", group_by="overall",
                         window=Window(start=PRESET.baseline.start, end=PRESET.current.end))
 CATALOG = """Return a single JSON object. For a bank comparison use:
@@ -81,6 +82,8 @@ def plan_question(question: str, mode: str) -> AnalysisPlan | TrendPlan | Clarif
         normalize = lambda value: " ".join(value.casefold().replace("–", "-").split())
         if normalize(question) in {normalize(QUESTION), normalize(PARAPHRASE)}:
             return PRESET
+        if normalize(question) == normalize(BANK_B_QUESTION):
+            return PRESET.model_copy(update={"bank_ids": ("B",)})
         if normalize(question).rstrip(".?") == normalize(TREND_QUESTION):
             return TREND_PRESET
         if "daily" in question.casefold():
@@ -113,8 +116,12 @@ def plan_question(question: str, mode: str) -> AnalysisPlan | TrendPlan | Clarif
     return outcome
 
 
-def ask(question: str, mode: str, fixture: Path):
+def ask(question: str, mode: str, fixture: Path, role=DemoRole.ANALYST):
+    role = DemoRole(role)
+    if role == DemoRole.BANK_A_VIEWER and re.search(r"\bbanks?\s+(?:b\b|a\s*(?:and|&|,|/)\s*b\b)|\bboth banks\b",
+                                                    question, re.I):
+        raise AccessDenied()
     outcome = plan_question(question, mode)
     if isinstance(outcome, Clarification):
         return outcome
-    return analyze_fixture(fixture, outcome)
+    return analyze_fixture(fixture, outcome, role)
