@@ -2,7 +2,7 @@
 import json
 import os
 import re
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from http.client import HTTPException
 from pathlib import Path
 from urllib.error import HTTPError
@@ -46,6 +46,43 @@ class PlannerError(ValueError):
     pass
 
 
+IST = timezone(timedelta(hours=5, minutes=30))
+RESERVE_REQUEST = """
+local used = tonumber(redis.call('GET', KEYS[1]) or '0')
+if used >= tonumber(ARGV[1]) then return 0 end
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then redis.call('EXPIRE', KEYS[1], 172800) end
+return 1
+"""
+
+
+def reserve_gemini_request():
+    limit = os.getenv("GEMINI_DAILY_LIMIT")
+    if limit is None:
+        return
+    if not re.fullmatch(r"[0-9]{1,15}", limit):
+        raise PlannerError("Invalid Gemini quota configuration. Set GEMINI_DAILY_LIMIT to a nonnegative integer (up to 15 digits).")
+    endpoint = os.getenv("UPSTASH_REDIS_REST_URL", "").rstrip("/")
+    token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+    if not re.fullmatch(r"https://[A-Za-z0-9.-]+(?::[0-9]+)?", endpoint) or not re.fullmatch(r"[!-~]+", token):
+        raise PlannerError("Invalid Gemini quota configuration. Check the Upstash REST URL and token.")
+
+    day = datetime.now(IST).date().isoformat()
+    command = ["EVAL", RESERVE_REQUEST, "1", f"bizilytix:gemini:daily:{day}", limit]
+    request = Request(endpoint, data=json.dumps(command).encode(),
+                      headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+    try:
+        with urlopen(request, timeout=5) as response:
+            reply = json.load(response)
+    except (OSError, HTTPException, ValueError) as exc:
+        raise PlannerError("Live Gemini is blocked because the quota service is unavailable.") from exc
+    result = reply.get("result") if isinstance(reply, dict) and "error" not in reply else None
+    if type(result) is not int or result not in (0, 1):
+        raise PlannerError("Live Gemini is blocked because the quota service did not confirm a reservation.")
+    if result == 0:
+        raise PlannerError("Daily Gemini quota reached. Live requests resume at midnight IST.")
+
+
 def gemini(question: str, window: Window | None = None) -> str:
     key = os.getenv("GEMINI_API_KEY")
     model = os.getenv("GEMINI_MODEL")
@@ -62,6 +99,7 @@ def gemini(question: str, window: Window | None = None) -> str:
                       + quote(model, safe="") + ":generateContent",
                       data=json.dumps(body).encode(),
                       headers={"Content-Type": "application/json", "x-goog-api-key": key})
+    reserve_gemini_request()
     try:
         with urlopen(request, timeout=30) as response:
             candidate = json.load(response)["candidates"][0]

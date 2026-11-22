@@ -27,6 +27,19 @@ $env:GEMINI_MODEL = Read-Host 'Gemini model ID (without models/)'
 
 Gemini proposes the plan. Python validates it and computes the results locally.
 
+### Deployment quota
+
+Set the following in your host’s secret manager or as top-level Streamlit deployment secrets. Use the same Upstash database and limit for all app instances.
+
+| Setting | Value |
+|---|---|
+| `GEMINI_API_KEY` and `GEMINI_MODEL` | Provider key and model ID for Live Gemini |
+| `GEMINI_DAILY_LIMIT` | Daily outbound attempt limit, for example the string `"100"`. Zero blocks all attempts. Leave unset for local use without Redis. |
+| `UPSTASH_REDIS_REST_URL` | HTTPS REST endpoint from the Upstash Redis database |
+| `UPSTASH_REDIS_REST_TOKEN` | Write-capable REST token permitting EVAL, GET, INCR and EXPIRE |
+
+Immediately before calling Gemini, the planner reserves one slot with an atomic Redis script. Sessions and roles share the daily counter. A fresh counter starts at midnight IST and each key expires after 48 hours. A failed Gemini attempt consumes its reservation. Live planning on a result-cache hit also consumes a slot. If Redis cannot confirm a reservation, configuration is invalid, or the limit is reached, the app shows an error and **Offline preset** remains available. Configure the REST endpoint and token using the [Upstash REST API guide](https://upstash.com/docs/redis/features/restapi).
+
 ## Dashboard
 
 Each Streamlit session keeps its 32 most recently used successful results. After planning and role checks, equivalent questions reuse a result when the validated plan, effective bank filters, active role and contents of both fixture CSVs match. A hit skips SQLite staging and execution. Live Gemini still interprets each eligible question. Denials, clarifications and failed analyses leave no cache entry. A new session starts empty.
