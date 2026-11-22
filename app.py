@@ -7,9 +7,9 @@ import pandas as pd
 import streamlit as st
 
 from analyst.analysis import Comparison, DailyTrend
-from analyst.data import QualityError
+from analyst.data import AccessDenied, DemoRole, QualityError
 from analyst.plan import Clarification
-from analyst.planner import QUESTION, TREND_QUESTION, PlannerError, ask
+from analyst.planner import BANK_B_QUESTION, QUESTION, TREND_QUESTION, PlannerError, ask
 
 FIXTURES = Path(__file__).resolve().parent / "data" / "fixtures"
 
@@ -122,8 +122,9 @@ def show_trend(result: DailyTrend):
     st.dataframe(table, hide_index=True, use_container_width=True)
 
 
-def show_evidence(result: Comparison | DailyTrend, fixture: str):
+def show_evidence(result: Comparison | DailyTrend, fixture: str, scope: str):
     with st.expander("Query and dataset evidence"):
+        st.write(scope)
         st.write("Quality checks passed for this analysis.")
         st.write(f"Synthetic datasets: {fixture}/transactions.csv and {fixture}/banks.csv")
         st.write("Success rate divides successful attempts by eligible terminal attempts with a valid bank.")
@@ -184,16 +185,20 @@ def main():
         fixture = st.radio("Synthetic fixture", ["Clean", "Broken"],
                            help="Broken contains one missing payment status.").lower()
     st.html('<header class="biz-banner"><h1>Bizilytix.ai</h1><p>AI Business Analyst</p></header>')
+    role = DemoRole(st.selectbox("Demo role", [role.value for role in DemoRole]))
     with st.container(border=True, key="question_panel"):
         question = st.text_area("Analysis question", value=QUESTION, key="question", height=85)
         with st.container(horizontal=True):
             submitted = st.button("Analyze", type="primary", disabled=not question.strip())
             st.button("Bank comparison example", on_click=restore_question, args=(QUESTION,))
             st.button("Daily trend example", on_click=restore_question, args=(TREND_QUESTION,))
+            st.button("Bank B example", on_click=restore_question, args=(BANK_B_QUESTION,))
     if submitted:
         try:
             with st.spinner("Running analysis…"):
-                result = ask(question, "offline" if mode == "Offline preset" else "live", FIXTURES / fixture)
+                result = ask(question, "offline" if mode == "Offline preset" else "live", FIXTURES / fixture, role)
+        except AccessDenied as exc:
+            st.error(str(exc))
         except QualityError as exc:
             st.error(str(exc))
             st.caption("To recover, select Clean in the sidebar and click Analyze again.")
@@ -203,11 +208,14 @@ def main():
             if isinstance(result, Clarification):
                 st.info(result.question)
             else:
+                banks = [value for key, value in result.parameters.items() if key.startswith("bank_")]
+                scope = "Effective scope: " + ", ".join(f"Bank {bank}" for bank in (banks or ["A", "B"]))
+                st.caption(scope)
                 if isinstance(result, DailyTrend):
                     show_trend(result)
                 else:
                     show_comparison(result, fixture)
-                show_evidence(result, fixture)
+                show_evidence(result, fixture, scope)
 
 
 main()
