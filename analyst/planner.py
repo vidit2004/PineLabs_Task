@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 
 from pydantic import TypeAdapter, ValidationError
 
-from .data import AccessDenied, DemoRole, analyze_fixture
+from .data import AccessDenied, DemoRole, ResultCache, analyze_fixture
 from .plan import AnalysisPlan, Clarification, TrendPlan, Window
 from .trend_dates import resolve_window
 
@@ -116,7 +116,7 @@ def plan_question(question: str, mode: str) -> AnalysisPlan | TrendPlan | Clarif
     return outcome
 
 
-def ask(question: str, mode: str, fixture: Path, role=DemoRole.ANALYST):
+def ask(question: str, mode: str, fixture: Path, role=DemoRole.ANALYST, *, cache: ResultCache | None = None):
     role = DemoRole(role)
     if role == DemoRole.BANK_A_VIEWER and re.search(r"\bbanks?\s+(?:b\b|a\s*(?:and|&|,|/)\s*b\b)|\bboth banks\b",
                                                     question, re.I):
@@ -124,4 +124,4 @@ def ask(question: str, mode: str, fixture: Path, role=DemoRole.ANALYST):
     outcome = plan_question(question, mode)
     if isinstance(outcome, Clarification):
         return outcome
-    return analyze_fixture(fixture, outcome, role)
+    return analyze_fixture(fixture, outcome, role, cache=cache)

@@ -1,11 +1,14 @@
 import csv
 import sqlite3
+from collections import OrderedDict
 from contextlib import closing
 from enum import Enum
+from hashlib import sha256
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from .analysis import BankCounts, summarize, summarize_trend
+from .analysis import BankCounts, Comparison, DailyTrend, summarize, summarize_trend
 from .plan import AnalysisPlan, TrendPlan
 from .queries import compile_queries
 
@@ -38,12 +41,21 @@ TABLES = {"banks": ("bank_id", "bank_name"),
           "transactions": ("attempt_id", "event_date_ist", "bank_id", "status")}
 
 
-def stage(folder, database):
+ResultCache = OrderedDict[tuple[DemoRole, str, tuple[bytes, ...]], Comparison | DailyTrend]
+
+
+def read_fixture(folder):
+    return {table: (folder / f"{table}.csv").read_bytes() for table in TABLES}
+
+
+def stage(folder, database, *, contents=None):
+    if contents is None:
+        contents = read_fixture(folder)
     with closing(sqlite3.connect(database)) as db, db:
         for table, columns in TABLES.items():
             names = ", ".join(columns)
             db.execute(f"CREATE TABLE {table} ({names})")
-            with (folder / f"{table}.csv").open(encoding="utf-8", newline="") as stream:
+            with StringIO(contents[table].decode("utf-8"), newline="") as stream:
                 reader = csv.reader(stream)
                 if next(reader, None) != list(columns):
                     raise QualityError(f"Check the columns in {table}.csv")
@@ -99,9 +111,24 @@ def compare(database: Path, plan: AnalysisPlan, role=DemoRole.ANALYST):
     return execute_plan(database, plan, role)
 
 
-def analyze_fixture(folder: Path, plan: AnalysisPlan | TrendPlan, role=DemoRole.ANALYST):
+def analyze_fixture(folder: Path, plan: AnalysisPlan | TrendPlan, role=DemoRole.ANALYST,
+                    *, cache: ResultCache | None = None):
     plan = authorized_plan(plan, role)
+    contents = read_fixture(folder)
+    if cache is not None:
+        if plan.bank_ids:
+            plan = plan.model_copy(update={"bank_ids": tuple(sorted(set(plan.bank_ids)))})
+        fingerprints = tuple(sha256(contents[table]).digest() for table in TABLES)
+        key = (DemoRole(role), plan.model_dump_json(), fingerprints)
+        if key in cache:
+            cache.move_to_end(key)
+            return cache[key]
     with TemporaryDirectory() as temp:
         database = Path(temp) / "fixture.sqlite"
-        stage(folder, database)
-        return _execute(database, plan, role)
+        stage(folder, database, contents=contents)
+        result = _execute(database, plan, role)
+    if cache is not None:
+        cache[key] = result
+        if len(cache) > 32:
+            cache.popitem(last=False)
+    return result

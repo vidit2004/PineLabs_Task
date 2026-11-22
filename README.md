@@ -29,6 +29,8 @@ Gemini proposes the plan. Python validates it and computes the results locally.
 
 ## Dashboard
 
+Each Streamlit session keeps its 32 most recently used successful results. After planning and role checks, equivalent questions reuse a result when the validated plan, effective bank filters, active role and contents of both fixture CSVs match. A hit skips SQLite staging and execution. Live Gemini still interprets each eligible question. Denials, clarifications and failed analyses leave no cache entry. A new session starts empty.
+
 Use **Demo role** below the banner to switch between **Analyst** (both banks) and **Bank A Viewer**. With **Offline preset** and **Clean** selected, run the bank comparison as the viewer to see Bank A’s counts and bound SQL filter. Select **Bank B example** and click **Analyze** to reproduce the denial. Switching to Analyst allows the same example. The selector demonstrates role scoping locally and is user-controlled.
 
 Run `.\.venv\Scripts\python.exe -m streamlit run app.py`. Select a planner and fixture in the sidebar, choose a bank comparison or daily trend example, then click **Analyze**. Expand **Query and dataset evidence** to inspect the executed SQL, bound parameters, source datasets and IST date windows.
